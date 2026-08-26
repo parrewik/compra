@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Lista de la compra — Eric Parra</title>
+<style>
+  :root{
+    --bg:#12151A;
+    --surface:#1B1F26;
+    --surface-2:#232833;
+    --border:#2E3440;
+    --text:#EDEFF2;
+    --text-dim:#8A93A3;
+    --text-faint:#5B6472;
+    --accent:#E4572E;
+    --accent-dim:#5A2A1D;
+    --accent-soft:#2A1E19;
+    --done:#3FA66B;
+    --done-dim:#173023;
+    --mono: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--sans);}
+  body{padding:14px 14px 60px; max-width:520px; margin:0 auto;}
+  h1{font-size:15px; font-weight:600; letter-spacing:0.02em; margin:2px 0 2px; color:var(--text);}
+  .sub{font-size:12px; color:var(--text-dim); margin-bottom:14px;}
+
+  .progressbar{height:5px; border-radius:3px; background:var(--surface); overflow:hidden; margin-bottom:6px;}
+  .progressbar-fill{height:100%; background:var(--accent); transition:width 0.3s;}
+  .progress-label{font-size:11px; color:var(--text-faint); margin-bottom:16px;}
+
+  .addrow{display:flex; flex-direction:column; gap:6px; margin-bottom:18px;}
+  .addrow-fields{display:flex; gap:6px;}
+  .addrow input, .addrow select{padding:10px 12px; border-radius:10px; background:var(--surface); border:1px solid var(--border); color:var(--text); font-size:13px; font-family:var(--sans);}
+  .addrow input{flex:1; min-width:0;}
+  .addrow select{flex:0 0 132px; -webkit-appearance:none; appearance:none;}
+  .addrow input::placeholder{color:var(--text-faint);}
+  .addrow button{padding:0 16px; border-radius:10px; background:var(--accent); border:1px solid var(--accent); color:#fff; font-size:13px; font-weight:600; cursor:pointer;}
+
+  .dept{margin-bottom:18px;}
+  .dept-head{display:flex; justify-content:space-between; align-items:baseline; margin:0 0 8px;}
+  .dept-label{font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-faint); font-weight:600;}
+  .dept-count{font-size:10.5px; color:var(--text-faint); font-family:var(--mono);}
+
+  .item{display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:10px 12px; margin-bottom:6px; cursor:pointer;}
+  .item.checked{border-color:var(--done-dim); background:linear-gradient(180deg, var(--surface), var(--done-dim) 400%);}
+  .checkdot{flex:0 0 22px; height:22px; border-radius:7px; background:var(--surface-2); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-size:13px; color:transparent;}
+  .item.checked .checkdot{background:var(--done); border-color:var(--done); color:#0d1f16;}
+  .item-body{flex:1; min-width:0;}
+  .item-name{font-size:13.5px; font-weight:600; color:var(--text); line-height:1.3;}
+  .item.checked .item-name{color:var(--text-dim); text-decoration:line-through; text-decoration-color:var(--text-faint);}
+  .item-qty{font-size:11px; color:var(--text-dim); margin-top:1px;}
+  .item.checked .item-qty{color:var(--text-faint);}
+  .item-del{flex:0 0 auto; font-size:16px; color:var(--text-faint); padding:4px 6px; cursor:pointer;}
+
+  .footer-row{display:flex; justify-content:space-between; align-items:center; margin-top:18px;}
+  .reset-btn{font-size:11.5px; color:var(--text-faint); background:none; border:none; text-decoration:underline; cursor:pointer; padding:6px 0;}
+  .hint{font-size:10.5px; color:var(--text-faint); text-align:right;}
+</style>
+</head>
+<body>
+
+<h1>Lista de la compra — Eric Parra</h1>
+<div class="sub">Plan nutricional lunes a viernes</div>
+
+<div class="progressbar"><div class="progressbar-fill" id="progressFill"></div></div>
+<div class="progress-label" id="progressLabel"></div>
+
+<div class="addrow">
+  <div class="addrow-fields">
+    <input type="text" id="newItemName" placeholder="Añadir producto…">
+    <select id="newItemDept"></select>
+  </div>
+  <button id="addItemBtn">Añadir a la lista</button>
+</div>
+
+<div id="deptList"></div>
+
+<div class="footer-row">
+  <button class="reset-btn" id="resetBtn">Reiniciar compra (nueva semana)</button>
+  <span class="hint">Progreso guardado<br>automáticamente</span>
+</div>
+
+<script>
+(function(){
+
+  var DEPARTMENTS = [
+    { id:'fruteria', name:'Frutería', items:[
+      {name:'Manzanas', qty:'7 unidades'},
+      {name:'Pimiento y cebolla', qty:'para salteados'},
+      {name:'Calabacín', qty:'para fajitas y salteados'},
+      {name:'Zanahoria', qty:'para poke, fajitas y ensalada'},
+      {name:'Pepino', qty:'para poke y ensalada'},
+      {name:'Rábano', qty:'para el poke'},
+      {name:'Champiñones', qty:'opcional'},
+      {name:'Lechuga o canónigos', qty:'ensalada grande'},
+      {name:'Tomate fresco', qty:'ensalada miércoles'},
+      {name:'Espinacas frescas', qty:'100 g'}
+    ]},
+    { id:'panaderia', name:'Panadería', items:[
+      {name:'Pan integral', qty:'~250 g en total'},
+      {name:'Wraps integrales', qty:'2 unidades'}
+    ]},
+    { id:'carniceria', name:'Carnicería', items:[
+      {name:'Pechuga de pollo', qty:'380 g'},
+      {name:'Pechuga de pavo', qty:'380 g'},
+      {name:'Pollo picado (o carne picada)', qty:'150 g'},
+      {name:'Solomillo de cerdo o ternera', qty:'200 g'}
+    ]},
+    { id:'congelados', name:'Congelados', items:[
+      {name:'Edamame desgranado', qty:'120 g'}
+    ]},
+    { id:'lacteos', name:'Lácteos y huevos', items:[
+      {name:'Huevos', qty:'16 uds (2 docenas)'},
+      {name:'Skyr o yogur griego 0%', qty:'1,7 kg en total'},
+      {name:'Requesón o cottage', qty:'350 g'},
+      {name:'Mozzarella', qty:'50 g'}
+    ]},
+    { id:'conservas', name:'Despensa — conservas', items:[
+      {name:'Atún en conserva al natural', qty:'~560 g (7 latas aprox.)'},
+      {name:'Tomate triturado natural', qty:'1 bote'}
+    ]},
+    { id:'cereales', name:'Despensa — arroz, pasta y cereales', items:[
+      {name:'Arroz', qty:'~300 g en crudo'},
+      {name:'Quinoa', qty:'~50 g en crudo'},
+      {name:'Pasta integral', qty:'~100 g en crudo'},
+      {name:'Granola sin azúcar añadido', qty:'~60 g'}
+    ]},
+    { id:'frutossecos', name:'Despensa — frutos secos', items:[
+      {name:'Nueces', qty:'110 g'},
+      {name:'Almendras', qty:'55 g'}
+    ]},
+    { id:'aceites', name:'Despensa — aceites y salsas', items:[
+      {name:'Aceite de oliva virgen extra', qty:'~60 ml para la semana'},
+      {name:'Aceite de sésamo', qty:'~20 ml'},
+      {name:'Salsa de soja', qty:'1 bote pequeño'}
+    ]},
+    { id:'otros', name:'Otros', items:[] }
+  ];
+
+  var state = { checks:{}, custom:{} };
+
+  function loadState(){
+    try{
+      var c = localStorage.getItem('lista-compra-checks');
+      if(c){ state.checks = JSON.parse(c); }
+    }catch(e){}
+    try{
+      var cu = localStorage.getItem('lista-compra-custom');
+      if(cu){ state.custom = JSON.parse(cu); }
+    }catch(e){}
+    render();
+  }
+  function saveChecks(){
+    try{ localStorage.setItem('lista-compra-checks', JSON.stringify(state.checks)); }catch(e){}
+  }
+  function saveCustom(){
+    try{ localStorage.setItem('lista-compra-custom', JSON.stringify(state.custom)); }catch(e){}
+  }
+
+  function itemKey(deptId, idx){ return deptId + '|' + idx; }
+
+  function allItemsForDept(dept){
+    var extra = state.custom[dept.id] || [];
+    return dept.items.concat(extra);
+  }
+
+  function populateDeptSelect(){
+    var sel = document.getElementById('newItemDept');
+    sel.innerHTML = '';
+    DEPARTMENTS.forEach(function(dept){
+      var opt = document.createElement('option');
+      opt.value = dept.id;
+      opt.textContent = dept.name;
+      sel.appendChild(opt);
+    });
+  }
+
+  function render(){
+    var wrap = document.getElementById('deptList');
+    wrap.innerHTML = '';
+    var totalItems = 0, doneItems = 0;
+
+    DEPARTMENTS.forEach(function(dept){
+      var items = allItemsForDept(dept);
+      if(items.length === 0) return;
+
+      var section = document.createElement('div');
+      section.className = 'dept';
+
+      var head = document.createElement('div');
+      head.className = 'dept-head';
+      var deptDone = 0;
+      items.forEach(function(it, idx){ if(state.checks[itemKey(dept.id, idx)]) deptDone++; });
+      head.innerHTML = '<div class="dept-label">' + dept.name + '</div>' +
+        '<div class="dept-count">' + deptDone + '/' + items.length + '</div>';
+      section.appendChild(head);
+
+      items.forEach(function(it, idx){
+        totalItems++;
+        var key = itemKey(dept.id, idx);
+        var isChecked = !!state.checks[key];
+        if(isChecked) doneItems++;
+
+        var row = document.createElement('div');
+        row.className = 'item' + (isChecked ? ' checked' : '');
+
+        var dot = document.createElement('div');
+        dot.className = 'checkdot';
+        dot.textContent = '✓';
+        row.appendChild(dot);
+
+        var body = document.createElement('div');
+        body.className = 'item-body';
+        body.innerHTML = '<div class="item-name">' + it.name + '</div>' +
+          (it.qty ? '<div class="item-qty">' + it.qty + '</div>' : '');
+        row.appendChild(body);
+
+        row.onclick = function(){
+          state.checks[key] = !state.checks[key];
+          saveChecks();
+          render();
+        };
+
+        var isCustom = idx >= dept.items.length;
+        if(isCustom){
+          var del = document.createElement('div');
+          del.className = 'item-del';
+          del.textContent = '×';
+          del.onclick = function(e){
+            e.stopPropagation();
+            var customIdx = idx - dept.items.length;
+            state.custom[dept.id].splice(customIdx, 1);
+            delete state.checks[key];
+            saveCustom();
+            saveChecks();
+            render();
+          };
+          row.appendChild(del);
+        }
+
+        section.appendChild(row);
+      });
+
+      wrap.appendChild(section);
+    });
+
+    document.getElementById('progressFill').style.width = totalItems ? Math.round(100*doneItems/totalItems) + '%' : '0%';
+    document.getElementById('progressLabel').textContent = doneItems + ' de ' + totalItems + ' productos en el carrito';
+  }
+
+  document.getElementById('addItemBtn').onclick = function(){
+    var input = document.getElementById('newItemName');
+    var name = input.value.trim();
+    if(!name) return;
+    var deptId = document.getElementById('newItemDept').value;
+    if(!state.custom[deptId]) state.custom[deptId] = [];
+    state.custom[deptId].push({name:name, qty:''});
+    saveCustom();
+    input.value = '';
+    render();
+  };
+  document.getElementById('newItemName').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ document.getElementById('addItemBtn').click(); }
+  });
+
+  document.getElementById('resetBtn').onclick = function(){
+    state.checks = {};
+    saveChecks();
+    render();
+  };
+
+  loadState();
+  populateDeptSelect();
+})();
+</script>
+
+</body>
+</html>
